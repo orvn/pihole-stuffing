@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+#
+# Pihole route customization script
+#
+
+set -o errexit
+set -o nounset
+set -o pipefail
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
 
 if [[ "$(id -u)" != "0" ]]; then
    echo "This script must be run as root. Try running with sudo." >&2
