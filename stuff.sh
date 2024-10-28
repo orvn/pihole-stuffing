@@ -10,33 +10,46 @@ if [[ "${TRACE-0}" == "1" ]]; then
     set -o xtrace
 fi
 
+# Config
+PIHOLE_IP="192.168.0.200"
+
+# Consts
+WWW_USER="www-data"
+PIHOLE_BIN="$(which pihole)"
+UNBLOCK_SCRIPT="/var/www/html/unblock.sh"
+PIHOLE_SUDOERS="/etc/sudoers.d/pihole_www"
+PIHOLE_CUSTOM_LIST="/etc/pihole/custom.list"
+LIGHTTPD_EXTERNAL_CONF="/etc/lighttpd/external.conf"
+
 if [[ "$(id -u)" != "0" ]]; then
    echo "This script must be run as root. Try running with sudo." >&2
    exit 1
 fi
 
 add_dns_record() {
-    if ! grep -q "192.168.0.200 unblock.ads" "/etc/pihole/custom.list" 2>/dev/null; then
-        echo "192.168.0.200 unblock.ads" >> "/etc/pihole/custom.list"
+    local domain="$1"
+    local ip="$2"
+    if ! grep -q "$ip $domain" "$PIHOLE_CUSTOM_LIST" 2>/dev/null; then
+        echo "$ip $domain" >> "$PIHOLE_CUSTOM_LIST"
     fi
 }
 
 create_unblock_sh() {
-    cat > "/var/www/html/unblock.sh" <<EOF
+    cat > "$UNBLOCK_SCRIPT" <<EOF
 #!/usr/bin/env bash
 sudo pihole disable 5m
 EOF
-    chmod +x "/var/www/html/unblock.sh"
+    chmod +x "$UNBLOCK_SCRIPT"
 }
 
 modify_lighttpd_conf() {
-    if [[ -f "/etc/lighttpd/external.conf" && ! -f "/etc/lighttpd/external.conf.backup" ]]; then
-        cp "/etc/lighttpd/external.conf" "/etc/lighttpd/external.conf.backup"
+    if [[ -f "$LIGHTTPD_EXTERNAL_CONF" && ! -f "$LIGHTTPD_EXTERNAL_CONF.backup" ]]; then
+        cp "$LIGHTTPD_EXTERNAL_CONF" "$LIGHTTPD_EXTERNAL_CONF.backup"
     fi
 
-    sed -i '/^\$HTTP\["host"\] == "unblock.ads"/,/^}/d' "/etc/lighttpd/external.conf" 2>/dev/null || true
+    sed -i '/^\$HTTP\["host"\] == "unblock.ads"/,/^}/d' "$LIGHTTPD_EXTERNAL_CONF" 2>/dev/null || true
 
-    cat >> "/etc/lighttpd/external.conf" <<EOF
+    cat >> "$LIGHTTPD_EXTERNAL_CONF" <<EOF
 
 \$HTTP["host"] == "unblock.ads" {
     server.document-root = "/var/www/html"
@@ -47,8 +60,8 @@ EOF
 }
 
 modify_sudoers() {
-    if [[ ! -f "/etc/sudoers.d/pihole_www" ]]; then
-        echo "www-data ALL=NOPASSWD: $(which pihole) disable" > "/etc/sudoers.d/pihole_www"
+    if [[ ! -f "$PIHOLE_SUDOERS" ]]; then
+        echo "$WWW_USER ALL=NOPASSWD: $PIHOLE_BIN disable" > "$PIHOLE_SUDOERS"
     fi
 }
 
@@ -58,7 +71,7 @@ restart_services() {
 }
 
 main() {
-    add_dns_record
+    add_dns_record "unblock.ads" "$PIHOLE_IP"
     create_unblock_sh
     modify_lighttpd_conf
     modify_sudoers
