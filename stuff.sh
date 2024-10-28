@@ -15,22 +15,28 @@ if [[ "$(id -u)" != "0" ]]; then
    exit 1
 fi
 
-# DNS record
-grep -q "192.168.0.200 unblock.ads" "/etc/pihole/custom.list" 2>/dev/null || echo "192.168.0.200 unblock.ads" >> "/etc/pihole/custom.list"
+add_dns_record() {
+    if ! grep -q "192.168.0.200 unblock.ads" "/etc/pihole/custom.list" 2>/dev/null; then
+        echo "192.168.0.200 unblock.ads" >> "/etc/pihole/custom.list"
+    fi
+}
 
-# Create an unblock.sh script
-cat > "/var/www/html/unblock.sh" <<EOF
+create_unblock_sh() {
+    cat > "/var/www/html/unblock.sh" <<EOF
 #!/usr/bin/env bash
 sudo pihole disable 5m
 EOF
-chmod +x "/var/www/html/unblock.sh"
+    chmod +x "/var/www/html/unblock.sh"
+}
 
-# Backup and modify /etc/lighttpd/external.conf
-cp "/etc/lighttpd/external.conf" "/etc/lighttpd/external.conf.backup" 2>/dev/null || true
+modify_lighttpd_conf() {
+    if [[ -f "/etc/lighttpd/external.conf" && ! -f "/etc/lighttpd/external.conf.backup" ]]; then
+        cp "/etc/lighttpd/external.conf" "/etc/lighttpd/external.conf.backup"
+    fi
 
-sed -i '/^\$HTTP\["host"\] == "unblock.ads"/,/^}/d' "/etc/lighttpd/external.conf" 2>/dev/null || true
+    sed -i '/^\$HTTP\["host"\] == "unblock.ads"/,/^}/d' "/etc/lighttpd/external.conf" 2>/dev/null || true
 
-cat >> "/etc/lighttpd/external.conf" <<EOF
+    cat >> "/etc/lighttpd/external.conf" <<EOF
 
 \$HTTP["host"] == "unblock.ads" {
     server.document-root = "/var/www/html"
@@ -38,12 +44,25 @@ cat >> "/etc/lighttpd/external.conf" <<EOF
     url.rewrite-once = ( "^/\$" => "/unblock.sh" )
 }
 EOF
+}
 
-# Set up sudo permissions for the www-data user to disable Pi-hole
-echo "www-data ALL=NOPASSWD: $(which pihole) disable" > "/etc/sudoers.d/pihole_www"
+modify_sudoers() {
+    if [[ ! -f "/etc/sudoers.d/pihole_www" ]]; then
+        echo "www-data ALL=NOPASSWD: $(which pihole) disable" > "/etc/sudoers.d/pihole_www"
+    fi
+}
 
-# Restart services
-pihole restartdns
-service lighttpd restart
+restart_services() {
+    pihole restartdns
+    service lighttpd restart
+}
 
-echo "Pihole configuration completed successfully."
+main() {
+    add_dns_record
+    create_unblock_sh
+    modify_lighttpd_conf
+    modify_sudoers
+    restart_services
+}
+
+main "$@"
