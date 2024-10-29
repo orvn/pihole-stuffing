@@ -11,7 +11,9 @@ if [[ "${TRACE-0}" == "1" ]]; then
 fi
 
 # Config
-PIHOLE_IP="192.168.0.200"
+PIHOLE_IP="192.168.0.200" ## Change to your Pihole's dedicated IP on the local network
+UNBLOCK_DOMAIN="unblock.ads"
+BLOCK_DOMAIN="block.ads"
 
 # Consts
 WWW_USER="www-data"
@@ -62,7 +64,6 @@ EOF
     echo "Created unblock script at $UNBLOCK_SCRIPT"
 }
 
-
 modify_lighttpd_conf() {
     # Backup existing external.conf
     if [[ -f "$LIGHTTPD_EXTERNAL_CONF" && ! -f "$LIGHTTPD_EXTERNAL_CONF.backup" ]]; then
@@ -71,24 +72,24 @@ modify_lighttpd_conf() {
     fi
 
     # Avoid duplicates
-    sed -i '/^\$HTTP\["host"\] == "unblock.ads"/,/^}/d' "$LIGHTTPD_EXTERNAL_CONF" 2>/dev/null || true
-    sed -i '/^\$HTTP\["host"\] == "block.ads"/,/^}/d' "$LIGHTTPD_EXTERNAL_CONF" 2>/dev/null || true
+    sed -i "/^\$HTTP\[\\"host\"\] == \"$UNBLOCK_DOMAIN\"/,/^}/d" "$LIGHTTPD_EXTERNAL_CONF" 2>/dev/null || true
+    sed -i "/^\$HTTP\[\\"host\"\] == \"$BLOCK_DOMAIN\"/,/^}/d" "$LIGHTTPD_EXTERNAL_CONF" 2>/dev/null || true
 
     # Append new configurations
     cat >> "$LIGHTTPD_EXTERNAL_CONF" <<EOF
 
-\$HTTP["host"] == "unblock.ads" {
+\$HTTP["host"] == "$UNBLOCK_DOMAIN" {
     server.document-root = "/var/www/html"
     cgi.assign = ( ".sh" => "/bin/bash" )
     url.rewrite-once = ( "^/\$" => "/unblock.sh" )
 }
 
-\$HTTP["host"] == "block.ads" {
+\$HTTP["host"] == "$BLOCK_DOMAIN" {
     server.document-root = "/var/www/html/admin"
-    accesslog.filename = "/var/log/lighttpd/block.ads.access.log"
+    accesslog.filename = "/var/log/lighttpd/${BLOCK_DOMAIN}.access.log"
 }
 EOF
-    echo "Modified $LIGHTTPD_EXTERNAL_CONF with configurations for 'unblock.ads' and 'block.ads'"
+    echo "Modified $LIGHTTPD_EXTERNAL_CONF with configurations for '$UNBLOCK_DOMAIN' and '$BLOCK_DOMAIN'"
 }
 
 modify_sudoers() {
@@ -108,8 +109,8 @@ restart_services() {
 }
 
 main() {
-    add_dns_record "unblock.ads" "$PIHOLE_IP"
-    add_dns_record "block.ads" "$PIHOLE_IP"
+    add_dns_record "$UNBLOCK_DOMAIN" "$PIHOLE_IP"
+    add_dns_record "$BLOCK_DOMAIN" "$PIHOLE_IP"
 
     create_unblock_sh
     modify_lighttpd_conf
