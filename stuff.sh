@@ -11,9 +11,6 @@ if [[ "${TRACE-0}" == "1" ]]; then
 fi
 
 # Config
-
-# PIHOLE_IP="192.168.0.200" ## Option to hardcode the Pihole IP
-PIHOLE_IP="$(hostname -I | awk '{print $1}')"
 UNBLOCK_DOMAIN="unblock.ads"
 BLOCK_DOMAIN="block.ads"
 
@@ -24,6 +21,46 @@ UNBLOCK_SCRIPT="/var/www/html/unblock.sh"
 PIHOLE_SUDOERS="/etc/sudoers.d/pihole_www"
 PIHOLE_CUSTOM_LIST="/etc/pihole/custom.list"
 LIGHTTPD_EXTERNAL_CONF="/etc/lighttpd/external.conf"
+
+# PIHOLE_IP="192.168.0.200" ## Option to hardcode the Pihole IP
+PIHOLE_IP="$(hostname -I | awk '{print $1}')"
+PIHOLE_IP="$(echo "$PIHOLE_IP" | xargs)"
+
+## Get Pihole IP
+IP_PATTERN='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+validate_ip() {
+    local ip="$1"
+    local stat=1
+
+    if [[ "$ip" =~ $IP_PATTERN ]]; then
+        IFS='.' read -r -a octets <<< "$ip"
+        for octet in "${octets[@]}"; do
+            if (( octet >= 0 && octet <= 255 )); then
+                stat=0
+            else
+                stat=1
+                break
+            fi
+        done
+    fi
+    return $stat
+}
+
+if validate_ip "$PIHOLE_IP"; then
+    echo "Using Pihole IP address: $PIHOLE_IP"
+else
+    echo "Could not automatically detect a valid Pihole IP address."
+    while true; do
+        read -p "Please enter the Pihole IP address: " PIHOLE_IP
+        PIHOLE_IP="$(echo "$PIHOLE_IP" | xargs)" # Whitespace
+        if validate_ip "$PIHOLE_IP"; then
+            echo "Using Pihole IP address: $PIHOLE_IP"
+            break
+        else
+            echo "Invalid IP address format. Please try again."
+        fi
+    done
+fi
 
 # Must be root
 if [[ "$(id -u)" != "0" ]]; then
