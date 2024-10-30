@@ -11,7 +11,9 @@ if [[ "${TRACE-0}" == "1" ]]; then
 fi
 
 # Config
-PIHOLE_IP="192.168.0.200" ## Change to your Pihole's dedicated IP on the local network
+
+# PIHOLE_IP="192.168.0.200" ## Option to hardcode the Pihole IP
+PIHOLE_IP="$(hostname -I | awk '{print $1}')"
 UNBLOCK_DOMAIN="unblock.ads"
 BLOCK_DOMAIN="block.ads"
 
@@ -33,7 +35,7 @@ fi
 if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
     echo 'Usage: ./configure_pihole.sh
 
-This script configures Pi-hole to add "unblock.ads" and "block.ads" endpoints.
+This script configures Pihole to add "unblock.ads" and "block.ads" endpoints.
 
 '
     exit
@@ -103,7 +105,7 @@ modify_sudoers() {
 
 restart_services() {
     pihole restartdns
-    echo "Restarted Pi-hole DNS"
+    echo "Restarted Pihole DNS"
     service lighttpd restart
     echo "Restarted Lighttpd"
 }
@@ -117,7 +119,7 @@ main() {
     modify_sudoers
     restart_services
 
-    echo "Pi-hole configuration completed successfully."
+    echo "Pihole configuration completed successfully."
 }
 
 main "$@"
