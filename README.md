@@ -1,5 +1,7 @@
 # Pihole Stuffing
 
+<img src="/images/piehole-stuffing.png" alt="piehole stuffing package graph image" width="500">
+
 A tool that customizes DNS endpoints for better quick access to pihole functionality straight from a URL.
 
 ## Requirements
