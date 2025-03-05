@@ -19,7 +19,7 @@ WWW_USER="www-data"
 PIHOLE_BIN="$(which pihole)"
 UNBLOCK_SCRIPT="/var/www/html/unblock.sh"
 PIHOLE_SUDOERS="/etc/sudoers.d/pihole_www"
-PIHOLE_CUSTOM_LIST="/etc/pihole/custom.list"
+DNSMASQ_CONF="/etc/dnsmasq.d/95-custom-dns.conf"
 LIGHTTPD_EXTERNAL_CONF="/etc/lighttpd/external.conf"
 
 # PIHOLE_IP="192.168.0.200" ## Option to hardcode the Pihole IP
@@ -83,11 +83,15 @@ cd "$(dirname "$0")"
 add_dns_record() {
     local domain="$1"
     local ip="$2"
-    if grep -q "$ip $domain" "$PIHOLE_CUSTOM_LIST" 2>/dev/null; then
+
+    # Use dnsmasq for proper Pi-hole resolution
+    touch "$DNSMASQ_CONF"
+
+    if grep -q "address=/$domain/" "$DNSMASQ_CONF" 2>/dev/null; then
         echo "DNS record for $domain already exists."
     else
-        echo "$ip $domain" >> "$PIHOLE_CUSTOM_LIST"
-        echo "Added DNS record: $ip $domain"
+        echo "address=/$domain/$ip" >> "$DNSMASQ_CONF"
+        echo "Added DNS record: $domain -> $ip"
     fi
 }
 
@@ -132,8 +136,8 @@ EOF
 }
 
 modify_sudoers() {
-    if [[ ! -f "$PIHOLE_SUDOERS" ]]; then
-        echo "$WWW_USER ALL=NOPASSWD: $PIHOLE_BIN disable" > "$PIHOLE_SUDOERS"
+    if ! grep -q "$WWW_USER ALL=NOPASSWD: $PIHOLE_BIN disable" "$PIHOLE_SUDOERS" 2>/dev/null; then
+        echo "$WWW_USER ALL=NOPASSWD: $PIHOLE_BIN disable" >> "$PIHOLE_SUDOERS"
         echo "Created sudoers file for $WWW_USER at $PIHOLE_SUDOERS"
     else
         echo "Sudoers file for $WWW_USER already exists at $PIHOLE_SUDOERS"
@@ -143,7 +147,7 @@ modify_sudoers() {
 restart_services() {
     pihole restartdns
     echo "Restarted Pihole DNS"
-    service lighttpd restart
+    systemctl restart lighttpd
     echo "Restarted Lighttpd"
 }
 
