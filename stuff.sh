@@ -84,7 +84,7 @@ add_dns_record() {
     local domain="$1"
     local ip="$2"
 
-    # Use dnsmasq for proper Pi-hole resolution
+    # Now uses dnsmasq
     touch "$DNSMASQ_CONF"
 
     if grep -q "address=/$domain/" "$DNSMASQ_CONF" 2>/dev/null; then
